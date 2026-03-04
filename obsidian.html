@@ -1,0 +1,2255 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OBSIDIAN LABS — Decision Architecture Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Syncopate:wght@400;700&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0F0F12;
+  --bg2: #121215;
+  --bg3: #0a0a0d;
+  --gold: #C6A75E;
+  --gold-light: #D4B96E;
+  --gold-dim: #8B7242;
+  --copper: #B87333;
+  --emerald: #1F3D36;
+  --emerald-light: #2A5248;
+  --champagne: #F4EFE6;
+  --text: #F4EFE6;
+  --text-dim: rgba(244,239,230,0.5);
+  --text-muted: rgba(244,239,230,0.25);
+  --glass: rgba(244,239,230,0.04);
+  --glass-border: rgba(198,167,94,0.15);
+  --surface-elevated: rgba(15,15,18,0.85);
+  --shadow-soft: 0 20px 60px rgba(0,0,0,0.4);
+  --shadow-strong: 0 30px 80px rgba(0,0,0,0.5);
+  --shadow-frame: 0 60px 120px rgba(0,0,0,0.6);
+  --noise-opacity: 0.03;
+  --transition: 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow: 800ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+[data-theme="light"] {
+  --bg: #F7F1E7;
+  --bg2: #EFE7DA;
+  --bg3: #E7DECF;
+  --gold: #AA833C;
+  --gold-light: #BC9A57;
+  --gold-dim: #8A6B31;
+  --copper: #A46739;
+  --text: #221B14;
+  --text-dim: rgba(34,27,20,0.72);
+  --text-muted: rgba(34,27,20,0.44);
+  --glass: rgba(255,255,255,0.66);
+  --glass-border: rgba(138,107,49,0.23);
+  --surface-elevated: rgba(250,245,236,0.92);
+  --shadow-soft: 0 18px 46px rgba(103,77,38,0.14);
+  --shadow-strong: 0 24px 70px rgba(103,77,38,0.18);
+  --shadow-frame: 0 44px 96px rgba(103,77,38,0.2);
+  --noise-opacity: 0.015;
+  --emerald: #DEEAE5;
+  --emerald-light: #CCDCD5;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Cormorant Garamond', serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+  transition: background var(--transition-slow), color var(--transition-slow);
+  cursor: none;
+}
+
+/* ═══════════════════════════════════════ CUSTOM CURSOR */
+#cursor {
+  position: fixed;
+  width: 12px; height: 12px;
+  background: var(--gold);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 99999;
+  transform: translate(-50%,-50%);
+  transition: width 0.3s, height 0.3s, background 0.3s, opacity 0.3s;
+  mix-blend-mode: difference;
+}
+#cursor-ring {
+  position: fixed;
+  width: 40px; height: 40px;
+  border: 1px solid var(--gold);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 99998;
+  transform: translate(-50%,-50%);
+  transition: width 0.5s cubic-bezier(0.16,1,0.3,1), height 0.5s cubic-bezier(0.16,1,0.3,1), border-color 0.3s, opacity 0.3s;
+  opacity: 0.6;
+}
+#cursor-trail {
+  position: fixed;
+  pointer-events: none;
+  z-index: 99997;
+}
+.cursor-dot {
+  position: absolute;
+  width: 4px; height: 4px;
+  background: var(--gold);
+  border-radius: 50%;
+  transform: translate(-50%,-50%);
+  pointer-events: none;
+  opacity: 0;
+  animation: trailFade 0.6s ease forwards;
+}
+@keyframes trailFade {
+  0% { opacity: 0.4; transform: translate(-50%,-50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%,-50%) scale(0.2); }
+}
+body:hover #cursor { opacity:1; }
+a:hover ~ #cursor, button:hover ~ #cursor { width:20px; height:20px; }
+
+/* ═══════════════════════════════════════ MAGNETIC CURSOR STATES */
+body.cursor-hover #cursor {
+  width: 60px; height: 60px;
+  background: transparent;
+  border: 1px solid var(--gold);
+  mix-blend-mode: normal;
+}
+body.cursor-hover #cursor-ring {
+  width: 80px; height: 80px;
+  opacity: 0.3;
+}
+body.cursor-text #cursor {
+  width: 3px; height: 30px;
+  border-radius: 2px;
+  background: var(--gold);
+}
+
+/* ═══════════════════════════════════════ NOISE OVERLAY */
+#noise {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  opacity: var(--noise-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  animation: noiseAnim 0.08s steps(2) infinite;
+}
+@keyframes noiseAnim {
+  0% { transform: translate(0,0); }
+  25% { transform: translate(-2%,-2%); }
+  50% { transform: translate(-4%, 4%); }
+  75% { transform: translate(4%,-4%); }
+  100% { transform: translate(-2%, 3%); }
+}
+
+/* ═══════════════════════════════════════ NAVBAR */
+nav {
+  position: fixed; top:0; left:0; right:0;
+  z-index: 1000;
+  padding: 24px 48px;
+  display: flex; align-items: center; justify-content: space-between;
+  transition: all var(--transition);
+}
+nav.scrolled {
+  background: rgba(15,15,18,0.7);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--glass-border);
+  padding: 16px 48px;
+}
+[data-theme="light"] nav.scrolled {
+  background: rgba(248,244,237,0.8);
+}
+.nav-logo {
+  font-family: 'Syncopate', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: var(--gold);
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.nav-logo span {
+  color: var(--text-dim);
+  font-size: 9px;
+  display: block;
+  letter-spacing: 0.5em;
+  margin-top: 2px;
+}
+.nav-links {
+  display: flex; gap: 40px; list-style: none;
+}
+.nav-links a {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  color: var(--text-dim);
+  text-decoration: none;
+  text-transform: uppercase;
+  position: relative;
+  transition: color var(--transition);
+}
+.nav-links a::after {
+  content: '';
+  position: absolute; bottom: -4px; left:50%; right:50%;
+  height: 1px; background: var(--gold);
+  transition: left 0.3s ease, right 0.3s ease;
+}
+.nav-links a:hover { color: var(--gold); }
+.nav-links a:hover::after { left:0; right:0; }
+.nav-right { display:flex; align-items:center; gap:24px; }
+#theme-toggle {
+  width: 48px; height: 26px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 13px;
+  cursor: none;
+  position: relative;
+  transition: background var(--transition);
+  flex-shrink: 0;
+}
+#theme-toggle::after {
+  content: '';
+  position: absolute; top:3px; left:3px;
+  width: 18px; height: 18px;
+  background: var(--gold);
+  border-radius: 50%;
+  transition: transform var(--transition);
+}
+[data-theme="light"] #theme-toggle::after { transform: translateX(22px); }
+.nav-cta {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+  border: 1px solid var(--gold-dim);
+  padding: 10px 24px;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: all var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+.nav-cta::before {
+  content:''; position:absolute; inset:0;
+  background: var(--gold);
+  transform: translateX(-101%);
+  transition: transform var(--transition);
+  z-index: -1;
+}
+.nav-cta:hover { color: var(--bg); }
+.nav-cta:hover::before { transform: translateX(0); }
+
+/* ═══════════════════════════════════════ HERO */
+#hero {
+  height: 100vh; min-height: 700px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+  flex-direction: column;
+}
+
+/* Grid */
+#hero-grid {
+  position: absolute; inset:0;
+  background-image:
+    linear-gradient(rgba(198,167,94,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(198,167,94,0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  animation: gridDrift 30s linear infinite;
+}
+@keyframes gridDrift {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(60px); }
+}
+
+/* Particles canvas */
+#hero-particles { position:absolute; inset:0; pointer-events:none; }
+
+/* Light beam */
+#hero-beam {
+  position: absolute; inset:0; pointer-events:none;
+  overflow: hidden;
+}
+#hero-beam::after {
+  content:'';
+  position:absolute;
+  width:2px; height:120%;
+  background: linear-gradient(transparent, rgba(198,167,94,0.15), transparent);
+  top:-10%; left:-10%;
+  transform: rotate(15deg) translateX(-200px);
+  animation: beamSweep 6s ease-in-out infinite;
+  filter: blur(3px);
+}
+@keyframes beamSweep {
+  0% { transform: rotate(15deg) translateX(-200px); opacity:0; }
+  20% { opacity:1; }
+  50% { transform: rotate(15deg) translateX(calc(100vw + 400px)); opacity:0.6; }
+  51%,100% { transform: rotate(15deg) translateX(-200px); opacity:0; }
+}
+
+/* 3D Obsidian Core */
+#obsidian-core-wrap {
+  position: absolute;
+  width: 360px; height: 360px;
+  display: flex; align-items:center; justify-content:center;
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+#obsidian-core {
+  width: 220px; height: 220px;
+  transform-style: preserve-3d;
+  animation: coreRotate 20s linear infinite;
+  transition: transform 0.1s ease-out;
+  filter: drop-shadow(0 40px 60px rgba(0,0,0,0.8));
+}
+@keyframes coreRotate {
+  0%   { transform: rotateX(15deg) rotateY(0deg) rotateZ(0deg); }
+  100% { transform: rotateX(15deg) rotateY(360deg) rotateZ(5deg); }
+}
+#core-glow {
+  position:absolute;
+  width:200px; height:200px;
+  border-radius:50%;
+  background: radial-gradient(circle, rgba(198,167,94,0.12) 0%, transparent 70%);
+  filter: blur(20px);
+  animation: glowPulse 4s ease-in-out infinite;
+}
+@keyframes glowPulse {
+  0%,100% { transform: scale(1); opacity:0.6; }
+  50% { transform: scale(1.3); opacity:1; }
+}
+#core-shadow {
+  position:absolute; bottom:-30px;
+  width:180px; height:30px;
+  background: radial-gradient(ellipse, rgba(0,0,0,0.6) 0%, transparent 70%);
+  filter: blur(10px);
+}
+
+/* Hero Text */
+#hero-content {
+  position: relative; z-index:10;
+  text-align: center;
+  margin-top: 200px;
+}
+.hero-eyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.5em;
+  color: var(--gold);
+  text-transform: uppercase;
+  margin-bottom: 24px;
+  opacity: 0;
+  animation: fadeUp 0.8s 0.3s ease forwards;
+}
+.hero-headline {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(54px, 8vw, 110px);
+  font-weight: 300;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  display: flex; gap: 0.25em; flex-wrap: wrap; justify-content: center;
+}
+.hero-word {
+  display: inline-block;
+  opacity: 0;
+  filter: blur(8px);
+  transform: translateY(20px);
+  animation: wordReveal 0.8s ease forwards;
+}
+.hero-word:nth-child(1) { animation-delay: 0.6s; }
+.hero-word:nth-child(2) { animation-delay: 0.75s; }
+.hero-word:nth-child(3) { animation-delay: 0.9s; }
+@keyframes wordReveal {
+  to { opacity:1; filter:blur(0); transform:translateY(0); }
+}
+.hero-headline em {
+  font-style: italic;
+  color: var(--gold);
+  font-weight: 300;
+}
+.hero-sub {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 18px;
+  font-weight: 300;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  margin-top: 28px;
+  max-width: 480px;
+  margin-left: auto; margin-right: auto;
+  opacity: 0;
+  transform: translateX(30px);
+  animation: slideInRight 0.8s 1.2s ease forwards;
+}
+@keyframes slideInRight {
+  to { opacity:1; transform:translateX(0); }
+}
+.hero-btns {
+  margin-top: 48px;
+  display: flex; gap:20px; justify-content:center; flex-wrap:wrap;
+  opacity:0;
+  animation: fadeUp 0.8s 1.5s ease forwards;
+}
+@keyframes fadeUp {
+  to { opacity:1; transform:translateY(0); }
+}
+.btn-primary {
+  font-family: 'Syncopate', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold);
+  border: 1px solid var(--gold-dim);
+  padding: 18px 44px;
+  text-decoration: none;
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition);
+  cursor: none;
+}
+.btn-primary::before {
+  content:''; position:absolute; inset:0;
+  background: var(--gold);
+  transform:scaleX(0); transform-origin:left;
+  transition: transform var(--transition);
+}
+.btn-primary:hover { color: var(--bg); }
+.btn-primary:hover::before { transform:scaleX(1); }
+.btn-primary span { position:relative; z-index:1; }
+.btn-ripple {
+  position:absolute; border-radius:50%;
+  background: rgba(198,167,94,0.3);
+  transform: scale(0);
+  animation: ripple 0.6s ease;
+  pointer-events: none;
+}
+@keyframes ripple {
+  to { transform:scale(4); opacity:0; }
+}
+.btn-secondary {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  border: 1px solid var(--glass-border);
+  padding: 18px 44px;
+  text-decoration: none;
+  transition: all var(--transition);
+  cursor: none;
+}
+.btn-secondary:hover { color:var(--text); border-color: var(--text-dim); }
+
+/* Scroll indicator */
+#scroll-ind {
+  position:absolute; bottom:40px; left:50%; transform:translateX(-50%);
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  opacity:0; animation: fadeUp 0.8s 2s ease forwards;
+}
+#scroll-ind span {
+  font-family:'DM Mono', monospace;
+  font-size:9px; letter-spacing:0.4em;
+  color:var(--text-muted); text-transform:uppercase;
+}
+.scroll-line {
+  width:1px; height:60px;
+  background: linear-gradient(var(--gold), transparent);
+  position:relative; overflow:hidden;
+}
+.scroll-line::after {
+  content:''; position:absolute; top:-100%; left:0;
+  width:100%; height:100%;
+  background: linear-gradient(transparent, var(--gold), transparent);
+  animation: scrollDrop 2s ease-in-out infinite;
+}
+@keyframes scrollDrop {
+  0% { top:-100%; }
+  100% { top:200%; }
+}
+
+/* ═══════════════════════════════════════ SECTION BASE */
+section {
+  position: relative;
+  overflow: hidden;
+}
+.section-label {
+  font-family:'DM Mono', monospace;
+  font-size: 9px; letter-spacing:0.6em;
+  color: var(--gold); text-transform:uppercase;
+  margin-bottom: 20px;
+  display: flex; align-items:center; gap:16px;
+}
+.section-label::before {
+  content:'';
+  width: 40px; height:1px;
+  background: var(--gold);
+  flex-shrink:0;
+}
+.reveal {
+  opacity:0; transform:translateY(40px);
+  transition: opacity 0.8s cubic-bezier(0.16,1,0.3,1), transform 0.8s cubic-bezier(0.16,1,0.3,1);
+}
+.reveal.visible { opacity:1; transform:translateY(0); }
+.reveal-left {
+  opacity:0; transform:translateX(-60px);
+  transition: opacity 0.8s cubic-bezier(0.16,1,0.3,1), transform 0.8s cubic-bezier(0.16,1,0.3,1);
+}
+.reveal-left.visible { opacity:1; transform:translateX(0); }
+.reveal-right {
+  opacity:0; transform:translateX(60px);
+  transition: opacity 0.8s cubic-bezier(0.16,1,0.3,1), transform 0.8s cubic-bezier(0.16,1,0.3,1);
+}
+.reveal-right.visible { opacity:1; transform:translateX(0); }
+
+/* ═══════════════════════════════════════ SECTION 2 — FORECAST */
+#forecast {
+  padding: 140px 80px;
+  background: var(--bg2);
+}
+.forecast-inner {
+  max-width: 1300px; margin:0 auto;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items:center;
+}
+.forecast-title {
+  font-size: clamp(36px, 5vw, 68px);
+  font-weight: 300; line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin-bottom: 28px;
+}
+.forecast-title em { font-style:italic; color:var(--gold); }
+.forecast-body {
+  font-size: 17px; line-height: 1.8;
+  color: var(--text-dim);
+  font-weight: 300;
+  margin-bottom: 36px;
+}
+.stat-row {
+  display:flex; gap:40px; margin-top:16px;
+}
+.stat-item {}
+.stat-num {
+  font-family:'Syncopate', sans-serif;
+  font-size: 28px; color: var(--gold);
+  letter-spacing:-0.02em;
+}
+.stat-label {
+  font-family:'DM Mono', monospace;
+  font-size:9px; color:var(--text-muted);
+  letter-spacing:0.3em; text-transform:uppercase;
+  margin-top:4px;
+}
+
+/* Chart */
+.chart-panel {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+.chart-panel::before {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(135deg, rgba(198,167,94,0.04) 0%, transparent 60%);
+}
+.chart-header {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:24px;
+}
+.chart-title {
+  font-family:'DM Mono', monospace;
+  font-size:10px; letter-spacing:0.3em; color:var(--text-dim);
+  text-transform:uppercase;
+}
+.chart-badge {
+  font-family:'DM Mono', monospace;
+  font-size:9px; letter-spacing:0.2em;
+  color: var(--gold); border: 1px solid var(--gold-dim);
+  padding:4px 10px; border-radius:2px;
+}
+#chart-canvas { width:100%; height:200px; }
+
+/* ═══════════════════════════════════════ SECTION 3 — DASHBOARD */
+#dashboard-section {
+  padding: 160px 80px;
+  background: var(--bg3);
+  text-align: center;
+}
+.dash-title {
+  font-size: clamp(36px, 5vw, 68px);
+  font-weight: 300; letter-spacing:-0.02em;
+  margin-bottom: 16px;
+}
+.dash-sub {
+  font-size:17px; color:var(--text-dim);
+  max-width:560px; margin:0 auto 80px;
+  font-weight:300; line-height:1.7;
+}
+.dashboard-wrap {
+  position:relative; display:inline-block;
+  max-width:900px; width:100%;
+  perspective: 1200px;
+}
+.dashboard-mock {
+  width:100%;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  overflow:hidden;
+  transform: perspective(1200px) rotateX(4deg);
+  box-shadow: var(--shadow-frame), 0 0 0 1px var(--glass-border);
+  animation: dashFloat 6s ease-in-out infinite;
+  transition: transform 0.6s cubic-bezier(0.16,1,0.3,1);
+}
+@keyframes dashFloat {
+  0%,100% { transform: perspective(1200px) rotateX(4deg) translateY(0); }
+  50% { transform: perspective(1200px) rotateX(4deg) translateY(-12px); }
+}
+.dash-topbar {
+  background: rgba(198,167,94,0.06);
+  border-bottom: 1px solid var(--glass-border);
+  padding: 14px 20px;
+  display:flex; align-items:center; gap:8px;
+}
+.dash-dot { width:10px; height:10px; border-radius:50%; }
+.dash-dot:nth-child(1) { background:#ff5f57; }
+.dash-dot:nth-child(2) { background:#febc2e; }
+.dash-dot:nth-child(3) { background:#28c840; }
+.dash-title-bar {
+  flex:1; text-align:center;
+  font-family:'DM Mono', monospace;
+  font-size:10px; color:var(--text-muted);
+  letter-spacing:0.3em;
+}
+.dash-body {
+  padding:24px;
+  display:grid;
+  grid-template-columns:220px 1fr 160px;
+  grid-template-rows: auto auto;
+  gap:16px;
+  min-height:320px;
+}
+.dash-panel {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius:4px; padding:16px;
+  position:relative; overflow:hidden;
+}
+.dash-panel::after {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(45deg, transparent 40%, rgba(198,167,94,0.03));
+  animation: lightSweep 5s ease-in-out infinite;
+}
+@keyframes lightSweep {
+  0%,80%,100% { opacity:0; }
+  40% { opacity:1; }
+}
+.dash-panel-label {
+  font-family:'DM Mono', monospace;
+  font-size:8px; letter-spacing:0.4em;
+  color:var(--gold); text-transform:uppercase;
+  margin-bottom:12px;
+}
+.dash-spark { display:flex; flex-direction:column; gap:6px; }
+.dash-bar {
+  height:3px; background:var(--glass-border);
+  border-radius:2px; overflow:hidden;
+}
+.dash-bar-fill {
+  height:100%; background:linear-gradient(90deg, var(--copper), var(--gold));
+  border-radius:2px; width:0;
+  transition: width 1.5s cubic-bezier(0.16,1,0.3,1);
+}
+.dash-main { grid-column:2; grid-row:1/3; }
+.dash-mini-chart { height:160px; position:relative; }
+.dash-side { grid-column:3; grid-row:1/3; }
+.dash-metric {
+  text-align:center; padding:16px 0;
+  border-bottom:1px solid var(--glass-border);
+}
+.dash-metric:last-child { border-bottom:none; }
+.dash-metric-val {
+  font-family:'Syncopate', sans-serif;
+  font-size:20px; color:var(--gold);
+}
+.dash-metric-key {
+  font-family:'DM Mono', monospace;
+  font-size:8px; color:var(--text-muted);
+  letter-spacing:0.3em; text-transform:uppercase;
+  margin-top:4px;
+}
+
+/* Callouts */
+.callout {
+  position:absolute;
+  background: var(--surface-elevated);
+  backdrop-filter:blur(20px);
+  border:1px solid var(--glass-border);
+  border-radius:4px;
+  padding:12px 18px;
+  font-family:'DM Mono', monospace;
+  font-size:10px; color:var(--text-dim);
+  letter-spacing:0.1em;
+  white-space:nowrap;
+  opacity:0; transform:scale(0.9);
+  transition: all 0.5s cubic-bezier(0.16,1,0.3,1);
+  pointer-events:none;
+}
+.callout.show { opacity:1; transform:scale(1); }
+.callout::before {
+  content:''; position:absolute;
+  width:30px; height:1px;
+  background: var(--gold-dim);
+}
+.callout-tl { top:-60px; left:-80px; }
+.callout-tl::before { right:-35px; top:50%; transform-origin:right; }
+.callout-br { bottom:-60px; right:-80px; }
+.callout-br::before { left:-35px; top:50%; }
+.callout-l { top:50%; left:-120px; transform:translateY(-50%) scale(0.9); }
+.callout-l.show { transform:translateY(-50%) scale(1); }
+.callout-l::before { right:-35px; top:50%; }
+.callout-r { top:30%; right:-120px; transform:translateY(-50%) scale(0.9); }
+.callout-r.show { transform:translateY(-50%) scale(1); }
+.callout-r::before { left:-35px; top:50%; }
+
+/* ═══════════════════════════════════════ SECTION 4 — FEATURES */
+#features {
+  padding:160px 80px;
+  background:var(--bg2);
+}
+.features-header {
+  max-width:600px; margin:0 auto 80px; text-align:center;
+}
+.features-title {
+  font-size: clamp(36px, 5vw, 64px);
+  font-weight:300; letter-spacing:-0.02em;
+  margin-bottom:16px;
+}
+.features-title em { color:var(--gold); font-style:italic; }
+.features-grid {
+  max-width:1200px; margin:0 auto;
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, auto);
+  gap:24px;
+}
+.feature-card {
+  background: var(--glass);
+  border:1px solid var(--glass-border);
+  padding:40px 36px;
+  border-radius:4px;
+  position:relative; overflow:hidden;
+  cursor:none;
+  transition: all 0.4s cubic-bezier(0.16,1,0.3,1);
+  opacity:0; transform: translateY(40px) rotateY(8deg);
+}
+.feature-card.visible {
+  opacity:1; transform:translateY(0) rotateY(0);
+}
+.feature-card:nth-child(1) { transition-delay:0s; margin-top:0; }
+.feature-card:nth-child(2) { transition-delay:0.1s; margin-top:40px; }
+.feature-card:nth-child(3) { transition-delay:0.2s; margin-top:-20px; }
+.feature-card:nth-child(4) { transition-delay:0.15s; margin-top:20px; }
+.feature-card:nth-child(5) { transition-delay:0.25s; margin-top:-30px; }
+.feature-card:nth-child(6) { transition-delay:0.1s; margin-top:10px; }
+.feature-card:hover {
+  transform: translateY(-8px) rotateY(0) !important;
+  border-color: var(--gold-dim);
+  box-shadow: var(--shadow-soft), 0 0 30px rgba(198,167,94,0.08);
+}
+.feature-card::before {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(135deg, rgba(198,167,94,0.05) 0%, transparent 60%);
+  opacity:0; transition: opacity var(--transition);
+}
+.feature-card:hover::before { opacity:1; }
+.feature-card::after {
+  content:''; position:absolute;
+  top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg, transparent, var(--gold), transparent);
+  transform:scaleX(0);
+  transition:transform 0.4s ease;
+}
+.feature-card:hover::after { transform:scaleX(1); }
+.feat-num {
+  font-family:'Syncopate', sans-serif;
+  font-size:9px; color:var(--gold-dim);
+  letter-spacing:0.4em; margin-bottom:24px;
+}
+.feat-icon {
+  width:40px; height:40px;
+  border:1px solid var(--glass-border);
+  border-radius:4px;
+  display:flex; align-items:center; justify-content:center;
+  margin-bottom:24px;
+  transition: border-color var(--transition);
+}
+.feature-card:hover .feat-icon { border-color:var(--gold-dim); }
+.feat-icon svg { width:18px; height:18px; stroke:var(--gold); fill:none; stroke-width:1.5; }
+.feat-title {
+  font-family:'Cormorant Garamond', serif;
+  font-size:22px; font-weight:400;
+  letter-spacing:-0.01em;
+  margin-bottom:14px; line-height:1.2;
+}
+.feat-desc {
+  font-size:15px; color:var(--text-dim);
+  line-height:1.7; font-weight:300;
+}
+
+/* ═══════════════════════════════════════ SECTION 5 — TESTIMONIALS */
+#testimonials {
+  padding:120px 0;
+  background: linear-gradient(180deg, var(--emerald) 0%, var(--bg3) 100%);
+  overflow:hidden;
+}
+.testi-header {
+  text-align:center; padding:0 80px; margin-bottom:60px;
+}
+.testi-title {
+  font-size: clamp(32px, 4vw, 56px);
+  font-weight:300; letter-spacing:-0.02em;
+}
+.testi-title em { color:var(--gold); font-style:italic; }
+.testi-track-wrap { overflow:hidden; position:relative; }
+.testi-track-wrap::before,
+.testi-track-wrap::after {
+  content:''; position:absolute; top:0; bottom:0; width:200px; z-index:2;
+}
+.testi-track-wrap::before { left:0; background:linear-gradient(90deg, var(--emerald), transparent); }
+.testi-track-wrap::after { right:0; background:linear-gradient(-90deg, var(--bg3), transparent); }
+.testi-track {
+  display:flex; gap:24px;
+  width: max-content;
+  animation: scrollTrack 35s linear infinite;
+  padding: 20px 12px;
+}
+.testi-track:hover { animation-play-state:paused; }
+@keyframes scrollTrack {
+  0% { transform:translateX(0); }
+  100% { transform:translateX(-50%); }
+}
+.testi-card {
+  width: 380px; flex-shrink:0;
+  background: rgba(244,239,230,0.04);
+  backdrop-filter:blur(10px);
+  border:1px solid rgba(198,167,94,0.1);
+  border-radius:4px;
+  padding:32px;
+  position:relative; overflow:hidden;
+  cursor:none;
+  transition: all 0.4s cubic-bezier(0.16,1,0.3,1);
+}
+.testi-card:hover {
+  transform:translateY(-8px);
+  border-color:var(--gold-dim);
+  box-shadow:0 20px 60px rgba(0,0,0,0.4);
+}
+.testi-card::before {
+  content:''; position:absolute;
+  left:0; top:0; bottom:0; width:3px;
+  background:var(--gold);
+  transform:scaleY(0);
+  transform-origin:top;
+  transition: transform 0.4s ease;
+}
+.testi-card:hover::before { transform:scaleY(1); }
+.testi-quote {
+  font-size:16px; line-height:1.8;
+  font-style:italic; font-weight:300;
+  color:var(--text-dim);
+  margin-bottom:24px;
+}
+.testi-author {
+  display:flex; align-items:center; gap:14px;
+}
+.testi-avatar {
+  width:36px; height:36px; border-radius:50%;
+  background:linear-gradient(135deg, var(--gold-dim), var(--copper));
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Syncopate', sans-serif; font-size:10px; color:var(--bg);
+}
+.testi-name {
+  font-family:'DM Mono', monospace;
+  font-size:10px; color:var(--text);
+  letter-spacing:0.1em;
+}
+.testi-role {
+  font-size:12px; color:var(--text-muted);
+  margin-top:2px;
+}
+
+/* ═══════════════════════════════════════ SECTION 6 — PRICING */
+#pricing {
+  padding:160px 80px;
+  background: var(--bg2);
+  text-align:center;
+}
+#pricing::before {
+  content:''; position:absolute; inset:0;
+  background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(31,61,54,0.4) 0%, transparent 70%);
+  pointer-events:none;
+}
+.pricing-title {
+  font-size:clamp(36px,5vw,68px);
+  font-weight:300; letter-spacing:-0.02em;
+  margin-bottom:16px;
+}
+.pricing-title em { color:var(--gold); font-style:italic; }
+.pricing-sub {
+  font-size:17px; color:var(--text-dim);
+  margin-bottom:48px; font-weight:300;
+}
+.pricing-toggle {
+  display:inline-flex;
+  background:var(--glass);
+  border:1px solid var(--glass-border);
+  border-radius:40px;
+  padding:4px; margin-bottom:64px;
+  position:relative;
+  gap:0;
+}
+.toggle-bg {
+  position:absolute; top:4px; bottom:4px;
+  background:linear-gradient(135deg, var(--gold-dim), var(--copper));
+  border-radius:40px;
+  transition: all var(--transition);
+}
+.toggle-btn {
+  font-family:'DM Mono', monospace;
+  font-size:10px; letter-spacing:0.2em;
+  text-transform:uppercase;
+  padding:10px 28px;
+  border:none; background:transparent;
+  color:var(--text-dim);
+  cursor:none;
+  position:relative; z-index:1;
+  transition: color var(--transition);
+  border-radius:40px;
+}
+.toggle-btn.active { color:var(--bg); }
+.pricing-cards {
+  display:flex; gap:24px;
+  max-width:1100px; margin:0 auto;
+  align-items:center;
+  justify-content:center;
+}
+.price-card {
+  flex:1; max-width:340px;
+  background:var(--glass);
+  border:1px solid var(--glass-border);
+  border-radius:4px;
+  padding:48px 40px;
+  position:relative; overflow:hidden;
+  transition: all 0.4s cubic-bezier(0.16,1,0.3,1);
+  cursor:none;
+}
+.price-card:hover {
+  transform: scale(1.03);
+  border-color:var(--gold-dim);
+  box-shadow:var(--shadow-strong);
+}
+.price-card.featured {
+  transform:scale(1.05);
+  border-color:var(--gold-dim);
+  background: linear-gradient(135deg, rgba(198,167,94,0.06) 0%, var(--glass) 100%);
+}
+.price-card.featured:hover { transform:scale(1.08); }
+.price-card.featured::before {
+  content:''; position:absolute; inset:0;
+  border:1px solid var(--gold-dim);
+  border-radius:4px;
+  animation: pricePulse 3s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes pricePulse {
+  0%,100% { opacity:0.3; box-shadow:inset 0 0 20px rgba(198,167,94,0.05); }
+  50% { opacity:1; box-shadow:inset 0 0 40px rgba(198,167,94,0.1); }
+}
+.price-tier {
+  font-family:'Syncopate', sans-serif;
+  font-size:10px; letter-spacing:0.4em;
+  color:var(--text-muted); text-transform:uppercase;
+  margin-bottom:24px;
+}
+.price-badge {
+  display:inline-block;
+  font-family:'DM Mono', monospace;
+  font-size:8px; letter-spacing:0.2em;
+  color:var(--bg); background:var(--gold);
+  padding:4px 10px; border-radius:2px;
+  margin-bottom:16px; text-transform:uppercase;
+}
+.price-amount {
+  margin:16px 0;
+  display:flex; align-items:flex-start; justify-content:center; gap:4px;
+}
+.price-currency {
+  font-family:'Cormorant Garamond', serif;
+  font-size:24px; font-weight:300;
+  color:var(--gold); margin-top:8px;
+}
+.price-num {
+  font-family:'Syncopate', sans-serif;
+  font-size:56px; line-height:1;
+  color:var(--text);
+  transition: all 0.4s ease;
+}
+.price-period {
+  font-family:'DM Mono', monospace;
+  font-size:11px; color:var(--text-muted);
+  align-self:flex-end; margin-bottom:8px;
+}
+.price-divider {
+  height:1px; background:var(--glass-border);
+  margin:28px 0;
+}
+.price-features { list-style:none; text-align:left; }
+.price-features li {
+  font-size:14px; color:var(--text-dim);
+  padding:8px 0;
+  display:flex; align-items:center; gap:10px;
+  font-weight:300;
+  border-bottom:1px solid rgba(198,167,94,0.05);
+}
+.price-features li:last-child { border:none; }
+.price-features li::before {
+  content:''; flex-shrink:0;
+  width:6px; height:6px;
+  border:1px solid var(--gold-dim);
+  border-radius:50%;
+}
+.price-cta {
+  display:block; margin-top:32px;
+  font-family:'Syncopate', sans-serif;
+  font-size:9px; letter-spacing:0.3em;
+  text-transform:uppercase;
+  color:var(--gold); border:1px solid var(--gold-dim);
+  padding:16px; text-decoration:none;
+  text-align:center;
+  transition: all var(--transition);
+  position:relative; overflow:hidden;
+  cursor:none;
+}
+.price-card.featured .price-cta {
+  background:var(--gold); color:var(--bg);
+  border-color:var(--gold);
+}
+.price-cta:hover {
+  background:var(--gold); color:var(--bg);
+}
+
+/* ═══════════════════════════════════════ FINAL CTA */
+#final-cta {
+  padding:200px 80px;
+  background: var(--bg3);
+  text-align:center;
+  position:relative; overflow:hidden;
+}
+#final-cta::before {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(180deg, transparent 0%, rgba(198,167,94,0.04) 50%, transparent 100%);
+  animation: waveGold 8s ease-in-out infinite;
+}
+@keyframes waveGold {
+  0%,100% { transform:scaleY(1); }
+  50% { transform:scaleY(1.5); }
+}
+#final-cta::after {
+  content:''; position:absolute;
+  height:1px; width:100%;
+  background:linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  top:50%; left:0;
+  animation: lightStreak 4s ease-in-out infinite;
+}
+@keyframes lightStreak {
+  0% { transform:translateX(-100%); opacity:0; }
+  50% { opacity:1; }
+  100% { transform:translateX(100%); opacity:0; }
+}
+.final-glow {
+  position:absolute; inset:0;
+  background: radial-gradient(ellipse 60% 40% at 50% 60%, rgba(198,167,94,0.06) 0%, transparent 70%);
+  pointer-events:none;
+}
+.final-title {
+  font-size: clamp(40px, 7vw, 96px);
+  font-weight:300; line-height:1.05;
+  letter-spacing:-0.03em;
+  position:relative; z-index:1;
+  text-shadow:0 0 80px rgba(198,167,94,0.2);
+}
+.final-title em { color:var(--gold); font-style:italic; }
+.final-sub {
+  font-size:18px; color:var(--text-dim);
+  margin:24px auto 48px;
+  max-width:500px; font-weight:300;
+  position:relative; z-index:1;
+}
+.btn-final {
+  display:inline-block;
+  font-family:'Syncopate', sans-serif;
+  font-size:12px; letter-spacing:0.3em;
+  text-transform:uppercase;
+  color:var(--bg); background:var(--gold);
+  padding:22px 64px;
+  text-decoration:none;
+  position:relative; z-index:1;
+  overflow:hidden;
+  transition: all var(--transition);
+  cursor:none;
+  box-shadow: 0 0 0 rgba(198,167,94,0);
+}
+.btn-final:hover {
+  transform:translateY(-4px);
+  box-shadow:0 20px 60px rgba(198,167,94,0.25), 0 0 40px rgba(198,167,94,0.15);
+}
+.btn-final::after {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+  opacity:0; transition:opacity var(--transition);
+}
+.btn-final:hover::after { opacity:1; }
+
+/* ═══════════════════════════════════════ FOOTER */
+footer {
+  background:var(--bg);
+  border-top:1px solid var(--glass-border);
+  padding:48px 80px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.footer-logo {
+  font-family:'Syncopate', sans-serif;
+  font-size:11px; letter-spacing:0.3em;
+  color:var(--gold);
+}
+.footer-legal {
+  font-family:'DM Mono', monospace;
+  font-size:9px; color:var(--text-muted);
+  letter-spacing:0.2em;
+}
+.footer-links {
+  display:flex; gap:32px; list-style:none;
+}
+.footer-links a {
+  font-family:'DM Mono', monospace;
+  font-size:9px; letter-spacing:0.2em;
+  color:var(--text-muted); text-decoration:none;
+  text-transform:uppercase;
+  transition:color var(--transition);
+}
+.footer-links a:hover { color:var(--gold); }
+
+/* ═══════════════════════════════════════ CHART */
+.chart-svg { width:100%; height:100%; }
+
+/* ═══════════════════════════════════════ PAGE TRANSITION */
+#page-loader {
+  position:fixed; inset:0; z-index:99999;
+  background:var(--bg);
+  display:flex; align-items:center; justify-content:center;
+  flex-direction:column; gap:24px;
+  animation: loaderOut 0.6s 2s ease forwards;
+}
+@keyframes loaderOut {
+  to { opacity:0; pointer-events:none; }
+}
+.loader-logo {
+  font-family:'Syncopate', sans-serif;
+  font-size:13px; letter-spacing:0.5em;
+  color:var(--gold);
+  animation: loaderPulse 1s ease-in-out infinite;
+}
+@keyframes loaderPulse {
+  0%,100% { opacity:0.4; }
+  50% { opacity:1; }
+}
+.loader-line {
+  width:200px; height:1px;
+  background:var(--glass-border);
+  overflow:hidden; position:relative;
+}
+.loader-fill {
+  position:absolute; top:0; left:0; bottom:0;
+  background:linear-gradient(90deg, var(--gold), var(--copper));
+  animation: loaderProgress 1.8s cubic-bezier(0.16,1,0.3,1) forwards;
+}
+@keyframes loaderProgress {
+  0% { width:0; }
+  100% { width:100%; }
+}
+
+/* ═══════════════════════════════════════ MAGNETIC BTN */
+.magnetic { display:inline-block; }
+
+/* ═══════════════════════════════════════ SCROLL MOTION FX */
+.scroll-fx-card {
+  position: relative;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.scroll-fx-text {
+  opacity: 0;
+  transform: translate3d(0, 26px, 0);
+  transition: opacity 520ms cubic-bezier(0.16, 1, 0.3, 1), transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+#hero-grid,
+#hero-particles,
+#noise,
+.final-glow,
+#core-glow {
+  will-change: transform;
+}
+.dashboard-mock.tilt-active {
+  animation-play-state: paused;
+  transition: transform 120ms linear;
+}
+
+/* ═══════════════════════════════════════ RESPONSIVE */
+@media (max-width:900px) {
+  nav { padding:20px 24px; }
+  nav.scrolled { padding:14px 24px; }
+  .nav-links { display:none; }
+  .forecast-inner { grid-template-columns:1fr; gap:48px; }
+  .features-grid { grid-template-columns:1fr 1fr; }
+  .pricing-cards { flex-direction:column; align-items:center; }
+  .price-card.featured { transform:none; }
+  footer { flex-direction:column; gap:24px; text-align:center; }
+  #forecast, #dashboard-section, #features, #pricing, #final-cta { padding:80px 24px; }
+}
+@media (max-width:600px) {
+  .features-grid { grid-template-columns:1fr; }
+  .hero-headline { font-size:48px; }
+  .dash-body { grid-template-columns:1fr; grid-template-rows:auto; }
+  .dash-main { grid-column:1; grid-row:auto; }
+  .dash-side { grid-column:1; grid-row:auto; }
+}
+
+/* HOVER INTERACTIONS */
+[data-magnetic] { cursor:none; }
+
+/* ═══════════════════════════════════════ LIGHT THEME REFINEMENTS */
+[data-theme="light"] #cursor {
+  mix-blend-mode: normal;
+}
+[data-theme="light"] nav.scrolled {
+  border-bottom-color: rgba(138,107,49,0.2);
+  box-shadow: 0 12px 32px rgba(103,77,38,0.08);
+}
+[data-theme="light"] #core-shadow {
+  background: radial-gradient(ellipse, rgba(86,62,28,0.22) 0%, transparent 70%);
+}
+[data-theme="light"] .chart-panel,
+[data-theme="light"] .dash-panel,
+[data-theme="light"] .feature-card,
+[data-theme="light"] .price-card,
+[data-theme="light"] .testi-card {
+  backdrop-filter: blur(6px);
+}
+[data-theme="light"] .callout {
+  color: var(--text-dim);
+  box-shadow: 0 14px 34px rgba(103,77,38,0.12);
+}
+[data-theme="light"] .testi-track-wrap::before {
+  background: linear-gradient(90deg, var(--emerald), transparent);
+}
+[data-theme="light"] .testi-track-wrap::after {
+  background: linear-gradient(-90deg, var(--bg3), transparent);
+}
+[data-theme="light"] .testi-card {
+  background: rgba(255,255,255,0.72);
+  border-color: rgba(138,107,49,0.2);
+  box-shadow: 0 10px 28px rgba(103,77,38,0.08);
+}
+[data-theme="light"] .testi-card:hover {
+  box-shadow: 0 18px 42px rgba(103,77,38,0.14);
+}
+[data-theme="light"] #pricing::before {
+  background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(76,118,105,0.2) 0%, transparent 70%);
+}
+[data-theme="light"] .final-title {
+  text-shadow: 0 0 56px rgba(170,131,60,0.2);
+}
+</style>
+</head>
+<body>
+
+<!-- PAGE LOADER -->
+<div id="page-loader">
+  <div class="loader-logo">OBSIDIAN LABS</div>
+  <div class="loader-line"><div class="loader-fill"></div></div>
+</div>
+
+<!-- NOISE -->
+<div id="noise"></div>
+
+<!-- CURSOR -->
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+<canvas id="cursor-trail" style="position:fixed;inset:0;pointer-events:none;z-index:99997;width:100%;height:100%;"></canvas>
+
+<!-- NAVBAR -->
+<nav id="navbar">
+  <a href="#" class="nav-logo">
+    OBSIDIAN<br>
+    <span>LABS</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#forecast">Intelligence</a></li>
+    <li><a href="#dashboard-section">Platform</a></li>
+    <li><a href="#features">Architecture</a></li>
+    <li><a href="#pricing">Access</a></li>
+  </ul>
+  <div class="nav-right">
+    <div id="theme-toggle" title="Toggle light/dark"></div>
+    <a href="#pricing" class="nav-cta">Request Access</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div id="hero-grid"></div>
+  <canvas id="hero-particles"></canvas>
+  <div id="hero-beam"></div>
+
+  <div id="obsidian-core-wrap">
+    <div id="core-glow"></div>
+    <svg id="obsidian-core" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="faceGrad1" cx="40%" cy="30%">
+          <stop offset="0%" stop-color="#2a2a30"/>
+          <stop offset="100%" stop-color="#0a0a0e"/>
+        </radialGradient>
+        <radialGradient id="faceGrad2" cx="60%" cy="40%">
+          <stop offset="0%" stop-color="#1e1e24"/>
+          <stop offset="100%" stop-color="#080809"/>
+        </radialGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="2" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <!-- Polyhedron faces -->
+      <polygon points="100,20 160,70 130,140 70,140 40,70" fill="url(#faceGrad1)" stroke="#C6A75E" stroke-width="0.6" opacity="0.9"/>
+      <polygon points="100,20 160,70 185,120 100,180" fill="url(#faceGrad2)" stroke="#B87333" stroke-width="0.6" opacity="0.7"/>
+      <polygon points="100,20 40,70 15,120 100,180" fill="url(#faceGrad1)" stroke="#C6A75E" stroke-width="0.4" opacity="0.5"/>
+      <polygon points="70,140 130,140 100,180" fill="#0d0d10" stroke="#C6A75E" stroke-width="0.6" opacity="0.8"/>
+      <polygon points="40,70 160,70 185,120 15,120" fill="#111114" stroke="#B87333" stroke-width="0.3" opacity="0.3"/>
+      <!-- Inner edges -->
+      <line x1="100" y1="20" x2="100" y2="180" stroke="#C6A75E" stroke-width="0.3" opacity="0.2"/>
+      <line x1="40" y1="70" x2="160" y2="70" stroke="#C6A75E" stroke-width="0.3" opacity="0.2"/>
+      <line x1="15" y1="120" x2="185" y2="120" stroke="#C6A75E" stroke-width="0.3" opacity="0.15"/>
+      <!-- Gold accent dots at vertices -->
+      <circle cx="100" cy="20" r="2" fill="#C6A75E" filter="url(#glow)" opacity="0.8"/>
+      <circle cx="160" cy="70" r="1.5" fill="#C6A75E" filter="url(#glow)" opacity="0.6"/>
+      <circle cx="40" cy="70" r="1.5" fill="#C6A75E" filter="url(#glow)" opacity="0.6"/>
+      <circle cx="100" cy="180" r="2" fill="#B87333" filter="url(#glow)" opacity="0.7"/>
+      <circle cx="185" cy="120" r="1" fill="#C6A75E" opacity="0.4"/>
+      <circle cx="15" cy="120" r="1" fill="#C6A75E" opacity="0.4"/>
+    </svg>
+    <div id="core-shadow"></div>
+  </div>
+
+  <div id="hero-content">
+    <div class="hero-eyebrow">Decision Architecture Engine v3.0</div>
+    <h1 class="hero-headline">
+      <span class="hero-word">Architect</span>
+      <span class="hero-word">the</span>
+      <span class="hero-word"><em>Inevitable.</em></span>
+    </h1>
+    <p class="hero-sub">
+      A new class of intelligence that doesn't predict outcomes —<br>
+      it engineers them with mathematical precision.
+    </p>
+    <div class="hero-btns">
+      <a href="#pricing" class="btn-primary magnetic" data-magnetic><span>Begin Architecture</span></a>
+      <a href="#dashboard-section" class="btn-secondary magnetic" data-magnetic>View Platform</a>
+    </div>
+  </div>
+
+  <div id="scroll-ind">
+    <div class="scroll-line"></div>
+    <span>Scroll</span>
+  </div>
+</section>
+
+<!-- SECTION 2 — FORECAST -->
+<section id="forecast">
+  <div class="forecast-inner">
+    <div class="reveal-left">
+      <div class="section-label">Predictive Intelligence</div>
+      <h2 class="forecast-title">
+        Transform uncertainty into<br>
+        <em>engineered inevitability.</em>
+      </h2>
+      <p class="forecast-body">
+        Obsidian's Decision Architecture Engine processes 10 billion probability vectors per second,
+        compressing chaotic outcome landscapes into precise, actionable decision trees with measurable confidence intervals.
+      </p>
+      <div class="stat-row">
+        <div class="stat-item">
+          <div class="stat-num" data-count="98.7">0</div>
+          <div class="stat-label">Forecast Accuracy</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num" data-count="10">0</div>
+          <div class="stat-label">Billion Vectors/s</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num" data-count="0.3">0</div>
+          <div class="stat-label">Second Decision Lag</div>
+        </div>
+      </div>
+    </div>
+    <div class="reveal-right">
+      <div class="chart-panel">
+        <div class="chart-header">
+          <span class="chart-title">Scenario Probability Matrix</span>
+          <span class="chart-badge">LIVE</span>
+        </div>
+        <canvas id="chart-canvas"></canvas>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 3 — DASHBOARD -->
+<section id="dashboard-section">
+  <div class="section-label reveal" style="justify-content:center;margin-bottom:20px;">
+    Platform Overview
+  </div>
+  <h2 class="dash-title reveal">The Architecture Interface</h2>
+  <p class="dash-sub reveal">
+    Every decision surface rendered in real-time. Every outcome probability mapped.
+    Every risk vector compressed into actionable intelligence.
+  </p>
+
+  <div class="dashboard-wrap reveal" id="dash-wrap">
+    <div class="dashboard-mock" id="dashboard-mock">
+      <div class="dash-topbar">
+        <div class="dash-dot"></div>
+        <div class="dash-dot"></div>
+        <div class="dash-dot"></div>
+        <div class="dash-title-bar">OBSIDIAN LABS — DECISION ARCHITECTURE ENGINE</div>
+      </div>
+      <div class="dash-body">
+        <div class="dash-panel">
+          <div class="dash-panel-label">Signal Strength</div>
+          <div class="dash-spark">
+            <div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:0.2em;margin-bottom:4px;"><span>Alpha</span><span>94%</span></div>
+            <div class="dash-bar"><div class="dash-bar-fill" data-w="94"></div></div>
+            <div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:0.2em;margin-top:8px;margin-bottom:4px;"><span>Beta</span><span>78%</span></div>
+            <div class="dash-bar"><div class="dash-bar-fill" data-w="78"></div></div>
+            <div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:0.2em;margin-top:8px;margin-bottom:4px;"><span>Gamma</span><span>61%</span></div>
+            <div class="dash-bar"><div class="dash-bar-fill" data-w="61"></div></div>
+            <div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:0.2em;margin-top:8px;margin-bottom:4px;"><span>Delta</span><span>88%</span></div>
+            <div class="dash-bar"><div class="dash-bar-fill" data-w="88"></div></div>
+          </div>
+        </div>
+        <div class="dash-panel dash-main">
+          <div class="dash-panel-label">Decision Matrix — Active</div>
+          <div class="dash-mini-chart">
+            <canvas id="dash-chart" style="width:100%;height:100%;"></canvas>
+          </div>
+        </div>
+        <div class="dash-panel dash-side">
+          <div class="dash-panel-label">Live Metrics</div>
+          <div class="dash-metric">
+            <div class="dash-metric-val" id="metric1">97.4<span style="font-size:12px">%</span></div>
+            <div class="dash-metric-key">Confidence</div>
+          </div>
+          <div class="dash-metric">
+            <div class="dash-metric-val" id="metric2">∆ 2.3</div>
+            <div class="dash-metric-key">Variance</div>
+          </div>
+          <div class="dash-metric">
+            <div class="dash-metric-val" id="metric3">14.2<span style="font-size:12px">k</span></div>
+            <div class="dash-metric-key">Nodes</div>
+          </div>
+          <div class="dash-metric">
+            <div class="dash-metric-val">LIVE</div>
+            <div class="dash-metric-key">Status</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Callouts -->
+    <div class="callout callout-tl" id="c1">↗ Probability Engine Active</div>
+    <div class="callout callout-br" id="c2">Risk Matrix Compressed ✓</div>
+    <div class="callout callout-l" id="c3">Scenario Branches: 1,247</div>
+    <div class="callout callout-r" id="c4">Neural Depth: 48 layers</div>
+  </div>
+</section>
+
+<!-- SECTION 4 — FEATURES -->
+<section id="features">
+  <div class="features-header">
+    <div class="section-label reveal" style="justify-content:center;">Architecture Modules</div>
+    <h2 class="features-title reveal">
+      Six pillars of<br><em>decision dominance.</em>
+    </h2>
+  </div>
+  <div class="features-grid">
+    <div class="feature-card" data-delay="0">
+      <div class="feat-num">01</div>
+      <div class="feat-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="feat-title">Decision Mapping Engine</div>
+      <div class="feat-desc">Renders every possible decision branch across a 10-dimensional outcome space. Real-time topology of your strategic landscape.</div>
+    </div>
+    <div class="feature-card" data-delay="1">
+      <div class="feat-num">02</div>
+      <div class="feat-icon">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+      </div>
+      <div class="feat-title">Scenario Branch Architecture</div>
+      <div class="feat-desc">Construct parallel decision trees that model 10,000+ divergent futures simultaneously with weighted probability scores.</div>
+    </div>
+    <div class="feature-card" data-delay="2">
+      <div class="feat-num">03</div>
+      <div class="feat-icon">
+        <svg viewBox="0 0 24 24"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+      </div>
+      <div class="feat-title">Risk Compression Modeling</div>
+      <div class="feat-desc">Proprietary compression algorithms reduce sprawling risk landscapes into actionable probability corridors with defined tolerance bands.</div>
+    </div>
+    <div class="feature-card" data-delay="3">
+      <div class="feat-num">04</div>
+      <div class="feat-icon">
+        <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      </div>
+      <div class="feat-title">Strategic Outcome Forecasting</div>
+      <div class="feat-desc">98.7% accurate multi-horizon forecasting across 3-month, 12-month, and 5-year strategic windows with confidence gradients.</div>
+    </div>
+    <div class="feature-card" data-delay="4">
+      <div class="feat-num">05</div>
+      <div class="feat-icon">
+        <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+      <div class="feat-title">Live Adaptive Intelligence</div>
+      <div class="feat-desc">Self-rewriting decision models that evolve in real-time as new signals enter the system. No retraining. No latency. Pure adaptation.</div>
+    </div>
+    <div class="feature-card" data-delay="5">
+      <div class="feat-num">06</div>
+      <div class="feat-icon">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+      </div>
+      <div class="feat-title">Multi-Dimensional Heat Analysis</div>
+      <div class="feat-desc">Six-axis heat mapping across market, regulatory, competitive, technological, human, and systemic risk dimensions simultaneously.</div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 5 — TESTIMONIALS -->
+<section id="testimonials">
+  <div class="testi-header">
+    <div class="section-label reveal" style="justify-content:center;">Verified Results</div>
+    <h2 class="testi-title reveal">Trusted by those who<br><em>architect outcomes.</em></h2>
+  </div>
+  <div class="testi-track-wrap">
+    <div class="testi-track" id="testi-track">
+      <!-- Cards duplicated for infinite scroll -->
+      <div class="testi-card">
+        <p class="testi-quote">"Obsidian didn't give us better data. It gave us the architecture to see what the data meant before the market understood it. We moved three months ahead."</p>
+        <div class="testi-author"><div class="testi-avatar">EV</div><div><div class="testi-name">ELENA VASQUEZ</div><div class="testi-role">Chief Strategy Officer, Meridian Capital</div></div></div>
+      </div>
+      <div class="testi-card">
+        <p class="testi-quote">"The scenario branching alone is worth the entire investment. We modeled 847 regulatory outcomes before the vote. We were positioned for all of them."</p>
+        <div class="testi-author"><div class="testi-avatar">RK</div><div><div class="testi-name">ROHAN KRISHNA</div><div class="testi-role">Head of Risk, Sable Infrastructure Partners</div></div></div>
+      </div>
+      <div class="testi-card">
+        <p class="testi-quote">"Our board now requires Obsidian analysis on every major decision. The precision of the confidence intervals is unlike anything we've used before."</p>
+        <div class="testi-author"><div class="testi-avatar">MC</div><div><div class="testi-name">MIRIAM CHEN</div><div class="testi-role">CEO, Atlas Bioventures</div></div></div>
+      </div>
+      <div class="testi-card">
+        <p class="testi-quote">"We ran the same acquisition analysis through three other systems. Obsidian was the only one that surfaced the single factor that would have made it fail."</p>
+        <div class="testi-author"><div class="testi-avatar">JW</div><div><div class="testi-name">JAMES WORTHINGTON</div><div class="testi-role">Managing Director, Vektor Advisory</div></div></div>
+      </div>
+      <div class="testi-card">
+        <p class="testi-quote">"Decision velocity increased by 4x. Our teams stopped debating scenarios and started executing. The architecture gave us shared certainty."</p>
+        <div class="testi-author"><div class="testi-avatar">AT</div><div><div class="testi-name">AMARA THORNE</div><div class="testi-role">COO, Syndicate Financial Group</div></div></div>
+      </div>
+      <!-- Duplicate for seamless loop -->
+      <div class="testi-card">
+        <p class="testi-quote">"Obsidian didn't give us better data. It gave us the architecture to see what the data meant before the market understood it. We moved three months ahead."</p>
+        <div class="testi-author"><div class="testi-avatar">EV</div><div><div class="testi-name">ELENA VASQUEZ</div><div class="testi-role">Chief Strategy Officer, Meridian Capital</div></div></div>
+      </div>
+      <div class="testi-card">
+        <p class="testi-quote">"The scenario branching alone is worth the entire investment. We modeled 847 regulatory outcomes before the vote. We were positioned for all of them."</p>
+        <div class="testi-author"><div class="testi-avatar">RK</div><div><div class="testi-name">ROHAN KRISHNA</div><div class="testi-role">Head of Risk, Sable Infrastructure Partners</div></div></div>
+      </div>
+      <div class="testi-card">
+        <p class="testi-quote">"Our board now requires Obsidian analysis on every major decision. The precision of the confidence intervals is unlike anything we've used before."</p>
+        <div class="testi-author"><div class="testi-avatar">MC</div><div><div class="testi-name">MIRIAM CHEN</div><div class="testi-role">CEO, Atlas Bioventures</div></div></div>
+      </div>
+      <div class="testi-card">
+        <p class="testi-quote">"We ran the same acquisition analysis through three other systems. Obsidian was the only one that surfaced the single factor that would have made it fail."</p>
+        <div class="testi-author"><div class="testi-avatar">JW</div><div><div class="testi-name">JAMES WORTHINGTON</div><div class="testi-role">Managing Director, Vektor Advisory</div></div></div>
+      </div>
+      <div class="testi-card">
+        <p class="testi-quote">"Decision velocity increased by 4x. Our teams stopped debating scenarios and started executing. The architecture gave us shared certainty."</p>
+        <div class="testi-author"><div class="testi-avatar">AT</div><div><div class="testi-name">AMARA THORNE</div><div class="testi-role">COO, Syndicate Financial Group</div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 6 — PRICING -->
+<section id="pricing">
+  <div class="section-label reveal" style="justify-content:center;">Access Tiers</div>
+  <h2 class="pricing-title reveal">Architecture for<br><em>every scale.</em></h2>
+  <p class="pricing-sub reveal">No lock-in contracts. Cancel architectural access anytime.</p>
+
+  <div class="pricing-toggle reveal" id="pricing-toggle">
+    <div class="toggle-bg" id="toggle-bg"></div>
+    <button class="toggle-btn active" id="btn-monthly" onclick="setPrice('monthly')">Monthly</button>
+    <button class="toggle-btn" id="btn-yearly" onclick="setPrice('yearly')">Yearly <span style="color:var(--gold-dim);font-size:8px;"> −20%</span></button>
+  </div>
+
+  <div class="pricing-cards reveal">
+    <div class="price-card">
+      <div class="price-tier">Analyst</div>
+      <div class="price-amount">
+        <span class="price-currency">$</span>
+        <span class="price-num" id="price1">490</span>
+        <span class="price-period">/mo</span>
+      </div>
+      <div class="price-divider"></div>
+      <ul class="price-features">
+        <li>Decision Mapping Engine</li>
+        <li>Up to 500 scenario branches</li>
+        <li>30-day forecast horizon</li>
+        <li>Standard risk compression</li>
+        <li>Email support</li>
+      </ul>
+      <a href="#" class="price-cta">Begin Access</a>
+    </div>
+    <div class="price-card featured">
+      <div class="price-badge">Most Powerful</div>
+      <div class="price-tier">Enterprise</div>
+      <div class="price-amount">
+        <span class="price-currency">$</span>
+        <span class="price-num" id="price2">2,400</span>
+        <span class="price-period">/mo</span>
+      </div>
+      <div class="price-divider"></div>
+      <ul class="price-features">
+        <li>Full Architecture Suite</li>
+        <li>Unlimited scenario branches</li>
+        <li>5-year forecast horizon</li>
+        <li>Maximum risk compression</li>
+        <li>Live Adaptive Intelligence</li>
+        <li>Multi-Dimensional Heat Analysis</li>
+        <li>Dedicated architect support</li>
+      </ul>
+      <a href="#" class="price-cta">Architect Now</a>
+    </div>
+    <div class="price-card">
+      <div class="price-tier">Studio</div>
+      <div class="price-amount">
+        <span class="price-currency">$</span>
+        <span class="price-num" id="price3">980</span>
+        <span class="price-period">/mo</span>
+      </div>
+      <div class="price-divider"></div>
+      <ul class="price-features">
+        <li>Decision Mapping Engine</li>
+        <li>Up to 5,000 scenario branches</li>
+        <li>12-month forecast horizon</li>
+        <li>Advanced risk compression</li>
+        <li>Strategic Outcome Forecasting</li>
+        <li>Priority support</li>
+      </ul>
+      <a href="#" class="price-cta">Begin Access</a>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section id="final-cta">
+  <div class="final-glow"></div>
+  <h2 class="final-title reveal">
+    The Future Is<br>
+    <em>Designed,</em> Not Guessed.
+  </h2>
+  <p class="final-sub reveal">Join 2,400+ strategists who stopped predicting and started architecting.</p>
+  <a href="#pricing" class="btn-final reveal magnetic" data-magnetic>Architect the Inevitable</a>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">OBSIDIAN LABS</div>
+  <div class="footer-legal">© 2025 Obsidian Labs, Inc. All Rights Reserved.</div>
+  <ul class="footer-links">
+    <li><a href="#">Privacy</a></li>
+    <li><a href="#">Terms</a></li>
+    <li><a href="#">Security</a></li>
+    <li><a href="#">Contact</a></li>
+  </ul>
+</footer>
+
+<script>
+/* ═══════════════════════════════════════════════════ CURSOR */
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursor-ring');
+const trailCanvas = document.getElementById('cursor-trail');
+const trailCtx = trailCanvas.getContext('2d');
+trailCanvas.width = window.innerWidth;
+trailCanvas.height = window.innerHeight;
+
+let mx = -100, my = -100;
+let rx = -100, ry = -100;
+let trailPoints = [];
+
+document.addEventListener('mousemove', (e) => {
+  mx = e.clientX; my = e.clientY;
+  cursor.style.left = mx + 'px';
+  cursor.style.top = my + 'px';
+
+  trailPoints.push({ x: mx, y: my, life: 1 });
+  if (trailPoints.length > 20) trailPoints.shift();
+});
+
+function animateCursor() {
+  rx += (mx - rx) * 0.12;
+  ry += (my - ry) * 0.12;
+  ring.style.left = rx + 'px';
+  ring.style.top = ry + 'px';
+
+  // Trail
+  trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
+  for (let i = 0; i < trailPoints.length; i++) {
+    const p = trailPoints[i];
+    p.life -= 0.05;
+    if (p.life <= 0) { trailPoints.splice(i, 1); i--; continue; }
+    const alpha = p.life * 0.15;
+    const r = p.life * 3;
+    trailCtx.beginPath();
+    trailCtx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    trailCtx.fillStyle = `rgba(198,167,94,${alpha})`;
+    trailCtx.fill();
+  }
+  requestAnimationFrame(animateCursor);
+}
+animateCursor();
+
+// Hover states
+document.querySelectorAll('a, button, [data-magnetic]').forEach(el => {
+  el.addEventListener('mouseenter', () => document.body.classList.add('cursor-hover'));
+  el.addEventListener('mouseleave', () => document.body.classList.remove('cursor-hover'));
+});
+
+window.addEventListener('resize', () => {
+  trailCanvas.width = window.innerWidth;
+  trailCanvas.height = window.innerHeight;
+});
+
+/* ═══════════════════════════════════════════════════ MAGNETIC BTNS */
+document.querySelectorAll('[data-magnetic]').forEach(el => {
+  el.addEventListener('mousemove', (e) => {
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = (e.clientX - cx) * 0.3;
+    const dy = (e.clientY - cy) * 0.3;
+    el.style.transform = `translate(${dx}px, ${dy}px)`;
+  });
+  el.addEventListener('mouseleave', () => {
+    el.style.transform = '';
+  });
+});
+
+/* ═══════════════════════════════════════════════════ RIPPLE */
+document.querySelectorAll('.btn-primary').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    const rect = btn.getBoundingClientRect();
+    const ripple = document.createElement('span');
+    ripple.className = 'btn-ripple';
+    ripple.style.width = ripple.style.height = '60px';
+    ripple.style.left = (e.clientX - rect.left - 30) + 'px';
+    ripple.style.top = (e.clientY - rect.top - 30) + 'px';
+    btn.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 600);
+  });
+});
+
+/* ═══════════════════════════════════════════════════ NAVBAR */
+window.addEventListener('scroll', () => {
+  document.getElementById('navbar').classList.toggle('scrolled', scrollY > 60);
+});
+
+/* ═══════════════════════════════════════════════════ THEME */
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  document.documentElement.setAttribute('data-theme',
+    document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+});
+
+/* ═══════════════════════════════════════════════════ PARTICLES */
+(function initParticles() {
+  const canvas = document.getElementById('hero-particles');
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [];
+  function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+  resize();
+  window.addEventListener('resize', resize);
+
+  for (let i = 0; i < 80; i++) {
+    particles.push({
+      x: Math.random() * 1920, y: Math.random() * 900,
+      vx: (Math.random() - 0.5) * 0.2,
+      vy: (Math.random() - 0.5) * 0.1 - 0.05,
+      r: Math.random() * 1.5 + 0.3,
+      a: Math.random() * 0.4 + 0.05
+    });
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.y < 0) p.y = H;
+      if (p.x < 0) p.x = W;
+      if (p.x > W) p.x = 0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(198,167,94,${p.a})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+/* ═══════════════════════════════════════════════════ PARALLAX CORE */
+(function() {
+  const wrap = document.getElementById('obsidian-core-wrap');
+  if (!wrap) return;
+  let px = 0, py = 0;
+
+  function renderCore() {
+    const s = Math.min(window.scrollY / 600, 1);
+    const scale = 1 + s * 0.3;
+    const ty = -s * 80 + py * 10;
+    const tx = px * 20;
+    wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`;
+    wrap.style.opacity = 1 - s * 0.8;
+  }
+
+  window.addEventListener('mousemove', (e) => {
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    px = (e.clientX - cx) / cx;
+    py = (e.clientY - cy) / cy;
+    renderCore();
+  });
+
+  window.addEventListener('scroll', renderCore, { passive: true });
+  renderCore();
+})();
+
+/* ═══════════════════════════════════════════════════ SCROLL REVEALS */
+const revealEls = document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .feature-card');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      if (e.target.classList.contains('feature-card')) {
+        e.target.classList.add('visible');
+      }
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+revealEls.forEach(el => observer.observe(el));
+
+/* ═══════════════════════════════════════════════════ CARD TEXT + PARALLAX FX */
+(function() {
+  const cards = Array.from(document.querySelectorAll('.feature-card, .price-card, .testi-card, .dash-panel'));
+  if (!cards.length) return;
+
+  const textSelector = [
+    '.feat-num', '.feat-title', '.feat-desc',
+    '.price-tier', '.price-badge', '.price-amount', '.price-period', '.price-features li', '.price-cta',
+    '.testi-quote', '.testi-name', '.testi-role',
+    '.dash-panel-label', '.dash-metric-val', '.dash-metric-key'
+  ].join(', ');
+
+  cards.forEach(card => {
+    card.classList.add('scroll-fx-card');
+    const textEls = Array.from(card.querySelectorAll(textSelector));
+    card._fxTextEls = textEls;
+    textEls.forEach(el => el.classList.add('scroll-fx-text'));
+  });
+
+  const heroGrid = document.getElementById('hero-grid');
+  const heroParticles = document.getElementById('hero-particles');
+  const finalGlow = document.querySelector('.final-glow');
+  const dashWrap = document.getElementById('dash-wrap');
+  const dashMock = dashWrap ? dashWrap.querySelector('.dashboard-mock') : null;
+
+  let lastY = window.scrollY;
+  let ticking = false;
+  let tiltX = 0, tiltY = 0;
+
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+  function updateFx() {
+    const y = window.scrollY;
+    const dir = y >= lastY ? 1 : -1;
+    const vh = window.innerHeight;
+    const vw = window.innerWidth;
+
+    cards.forEach(card => {
+      const rect = card.getBoundingClientRect();
+      const center = rect.top + rect.height * 0.5;
+      const distNorm = Math.abs(center - vh * 0.56) / (vh * 0.72);
+      const presence = clamp(1 - distNorm, 0, 1);
+      const textEls = card._fxTextEls || [];
+
+      textEls.forEach((el, i) => {
+        const lag = i * 0.07;
+        const p = clamp((presence - lag) * 1.6, 0, 1);
+        const yOffset = (1 - p) * (dir > 0 ? 24 : -24);
+        el.style.opacity = p.toFixed(3);
+        el.style.transform = `translate3d(0, ${yOffset.toFixed(2)}px, ${(p * 12).toFixed(2)}px)`;
+      });
+    });
+
+    if (heroGrid) heroGrid.style.backgroundPosition = `0 ${(y * 0.18).toFixed(2)}px`;
+    if (heroParticles) heroParticles.style.transform = `translate3d(0, ${(y * 0.12).toFixed(2)}px, 0) scale(1.02)`;
+    if (finalGlow) finalGlow.style.transform = `translate3d(0, ${(-y * 0.06).toFixed(2)}px, 0) scale(${(1 + y * 0.00004).toFixed(3)})`;
+
+    if (dashMock && dashWrap) {
+      const wrapRect = dashWrap.getBoundingClientRect();
+      const wrapCenterY = wrapRect.top + wrapRect.height * 0.5;
+      const viewWeight = clamp(1 - Math.abs(wrapCenterY - vh * 0.5) / (vh * 0.9), 0, 1);
+      const depthY = clamp((wrapCenterY - vh * 0.5) / vh, -1, 1);
+      const driftX = clamp((wrapRect.left + wrapRect.width * 0.5 - vw * 0.5) / vw, -1, 1);
+      const baseRX = 4 - (depthY * 8 * viewWeight);
+      const baseRY = driftX * 6 * viewWeight;
+      const rx = baseRX + tiltX;
+      const ry = baseRY + tiltY;
+      const tz = viewWeight * 20;
+      if (viewWeight > 0.03) {
+        dashMock.style.transform = `perspective(1200px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) translate3d(0, ${(-viewWeight * 10).toFixed(2)}px, ${tz.toFixed(2)}px)`;
+      } else {
+        dashMock.style.transform = '';
+      }
+    }
+
+    lastY = y;
+    ticking = false;
+  }
+
+  function requestFx() {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(updateFx);
+  }
+
+  window.addEventListener('scroll', requestFx, { passive: true });
+  window.addEventListener('resize', requestFx);
+
+  if (dashWrap && dashMock) {
+    dashWrap.addEventListener('mousemove', (e) => {
+      const r = dashWrap.getBoundingClientRect();
+      const nx = ((e.clientX - r.left) / r.width - 0.5) * 2;
+      const ny = ((e.clientY - r.top) / r.height - 0.5) * 2;
+      tiltY = clamp(nx * 5, -5, 5);
+      tiltX = clamp(-ny * 4, -4, 4);
+      dashMock.classList.add('tilt-active');
+      requestFx();
+    });
+    dashWrap.addEventListener('mouseleave', () => {
+      tiltX = 0;
+      tiltY = 0;
+      dashMock.classList.remove('tilt-active');
+      requestFx();
+    });
+  }
+
+  requestFx();
+})();
+
+/* ═══════════════════════════════════════════════════ FORECAST CHART */
+(function() {
+  const canvas = document.getElementById('chart-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth * 2;
+  canvas.height = canvas.offsetHeight * 2;
+  ctx.scale(2, 2);
+  const W = canvas.offsetWidth / 2;
+  const H = canvas.offsetHeight / 2;
+
+  const labels = ['Q1','Q2','Q3','Q4','Q1','Q2','Q3','Q4','Q1'];
+  const actual = [20,35,28,55,45,68,58,82,75];
+  const forecast = [null,null,null,null,null,68,72,88,95];
+
+  let progress = 0;
+
+  function easeInOut(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+  function drawChart(prog) {
+    ctx.clearRect(0,0,W,H);
+    const padL=30, padR=10, padT=10, padB=30;
+    const cW = W - padL - padR;
+    const cH = H - padT - padB;
+    const max = 110;
+
+    // Grid
+    for (let i=0;i<=4;i++) {
+      const y = padT + cH - (i/4)*cH;
+      ctx.beginPath();
+      ctx.moveTo(padL, y); ctx.lineTo(W-padR, y);
+      ctx.strokeStyle = 'rgba(198,167,94,0.08)';
+      ctx.lineWidth = 1; ctx.stroke();
+    }
+
+    // X labels
+    ctx.font = '9px DM Mono';
+    ctx.fillStyle = 'rgba(244,239,230,0.3)';
+    ctx.textAlign = 'center';
+    labels.forEach((l, i) => {
+      const x = padL + (i/(labels.length-1))*cW;
+      ctx.fillText(l, x, H-8);
+    });
+
+    // Actual line
+    const pts = actual.map((v,i) => ({
+      x: padL + (i/(actual.length-1))*cW,
+      y: padT + cH - (v/max)*cH
+    }));
+
+    const drawCount = Math.floor(prog * (pts.length-1));
+    const frac = (prog * (pts.length-1)) - drawCount;
+
+    ctx.beginPath();
+    pts.slice(0, drawCount+1).forEach((p,i) => {
+      if (i===0) ctx.moveTo(p.x,p.y);
+      else ctx.lineTo(p.x,p.y);
+    });
+    if (drawCount < pts.length-1 && frac > 0) {
+      const next = pts[drawCount+1];
+      ctx.lineTo(
+        pts[drawCount].x + (next.x - pts[drawCount].x)*frac,
+        pts[drawCount].y + (next.y - pts[drawCount].y)*frac
+      );
+    }
+
+    // Gradient fill
+    const grad = ctx.createLinearGradient(0, padT, 0, padT+cH);
+    grad.addColorStop(0, 'rgba(198,167,94,0.15)');
+    grad.addColorStop(1, 'rgba(198,167,94,0)');
+    ctx.lineTo(W-padR, padT+cH);
+    ctx.lineTo(padL, padT+cH);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.beginPath();
+    pts.slice(0, drawCount+2).forEach((p,i) => {
+      if (i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
+    });
+    ctx.strokeStyle = 'rgba(198,167,94,0.8)';
+    ctx.lineWidth = 1.5; ctx.lineJoin='round'; ctx.stroke();
+
+    // Nodes
+    pts.slice(0, drawCount+1).forEach((p,i) => {
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,3,0,Math.PI*2);
+      ctx.fillStyle = '#C6A75E'; ctx.fill();
+      // Glow
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,5,0,Math.PI*2);
+      ctx.fillStyle = 'rgba(198,167,94,0.2)'; ctx.fill();
+    });
+
+    // Forecast dashed line
+    if (prog > 0.5) {
+      const fp = prog > 0.5 ? (prog-0.5)*2 : 0;
+      const fcPts = forecast.map((v,i) => ({
+        x: padL + (i/(actual.length-1))*cW,
+        y: v !== null ? padT + cH - (v/max)*cH : null,
+        v
+      })).filter(p => p.v !== null);
+
+      ctx.setLineDash([4,4]);
+      ctx.beginPath();
+      const fcCount = Math.floor(fp*(fcPts.length-1));
+      fcPts.slice(0, fcCount+1).forEach((p,i) => {
+        if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
+      });
+      ctx.strokeStyle = 'rgba(184,115,51,0.6)';
+      ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  function animChart() {
+    if (progress < 1) {
+      progress = Math.min(progress + 0.008, 1);
+      drawChart(easeInOut(progress));
+    }
+    requestAnimationFrame(animChart);
+  }
+
+  const chartObs = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting) animChart();
+  }, {threshold: 0.3});
+  chartObs.observe(canvas);
+})();
+
+/* ═══════════════════════════════════════════════════ DASHBOARD CHART */
+(function() {
+  const canvas = document.getElementById('dash-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = canvas.offsetWidth * 2;
+    canvas.height = canvas.offsetHeight * 2;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(2,2);
+    draw();
+  }
+
+  function draw() {
+    const W = canvas.offsetWidth/2;
+    const H = canvas.offsetHeight/2;
+    ctx.clearRect(0,0,W,H);
+
+    const data = [30,55,42,70,65,80,72,88,75,92,85,95];
+    const max = 110;
+    const pad = 16;
+    const cW = W - pad*2, cH = H - pad*2;
+
+    const pts = data.map((v,i) => ({
+      x: pad + (i/(data.length-1))*cW,
+      y: pad + cH - (v/max)*cH
+    }));
+
+    // Gradient
+    const grad = ctx.createLinearGradient(0,pad,0,pad+cH);
+    grad.addColorStop(0,'rgba(198,167,94,0.12)');
+    grad.addColorStop(1,'rgba(198,167,94,0)');
+
+    ctx.beginPath();
+    pts.forEach((p,i) => { if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+    ctx.lineTo(pts[pts.length-1].x, pad+cH);
+    ctx.lineTo(pts[0].x, pad+cH);
+    ctx.fillStyle = grad; ctx.fill();
+
+    ctx.beginPath();
+    pts.forEach((p,i) => { if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+    ctx.strokeStyle = 'rgba(198,167,94,0.7)';
+    ctx.lineWidth = 1.5; ctx.lineJoin='round'; ctx.stroke();
+  }
+
+  setTimeout(() => { resize(); }, 500);
+  window.addEventListener('resize', resize);
+})();
+
+/* ═══════════════════════════════════════════════════ DASHBOARD BARS */
+const dashObs = new IntersectionObserver(entries => {
+  if (entries[0].isIntersecting) {
+    document.querySelectorAll('.dash-bar-fill').forEach(bar => {
+      bar.style.width = bar.dataset.w + '%';
+    });
+    // Callouts
+    setTimeout(() => { document.getElementById('c1').classList.add('show'); }, 400);
+    setTimeout(() => { document.getElementById('c2').classList.add('show'); }, 700);
+    setTimeout(() => { document.getElementById('c3').classList.add('show'); }, 1000);
+    setTimeout(() => { document.getElementById('c4').classList.add('show'); }, 1300);
+  }
+}, {threshold: 0.3});
+dashObs.observe(document.getElementById('dashboard-section'));
+
+/* ═══════════════════════════════════════════════════ COUNT UP */
+const countObs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const els = e.target.querySelectorAll('[data-count]');
+      els.forEach(el => {
+        const target = parseFloat(el.dataset.count);
+        const isDecimal = el.dataset.count.includes('.');
+        let start = 0;
+        const dur = 1500;
+        const startTime = performance.now();
+        function update(now) {
+          const t = Math.min((now - startTime) / dur, 1);
+          const ease = 1 - Math.pow(1-t, 3);
+          const val = start + (target - start) * ease;
+          el.textContent = isDecimal ? val.toFixed(1) : Math.floor(val);
+          if (t < 1) requestAnimationFrame(update);
+          else el.textContent = isDecimal ? target.toFixed(1) : target;
+        }
+        requestAnimationFrame(update);
+      });
+    }
+  });
+}, {threshold: 0.4});
+countObs.observe(document.getElementById('forecast'));
+
+/* ═══════════════════════════════════════════════════ LIVE METRICS */
+setInterval(() => {
+  const m1 = document.getElementById('metric1');
+  const m2 = document.getElementById('metric2');
+  const m3 = document.getElementById('metric3');
+  if (m1) m1.innerHTML = (96 + Math.random()*2).toFixed(1) + '<span style="font-size:12px">%</span>';
+  if (m2) m2.textContent = '∆ ' + (1.8 + Math.random()*1.2).toFixed(1);
+  if (m3) m3.innerHTML = (13 + Math.floor(Math.random()*3)) + '.' + Math.floor(Math.random()*9) + '<span style="font-size:12px">k</span>';
+}, 2000);
+
+/* ═══════════════════════════════════════════════════ PRICING TOGGLE */
+const prices = {
+  monthly: [490, 2400, 980],
+  yearly:  [392, 1920, 784]
+};
+let currentMode = 'monthly';
+
+function setPrice(mode) {
+  currentMode = mode;
+  const bg = document.getElementById('toggle-bg');
+  if (mode === 'monthly') {
+    bg.style.left = '4px'; bg.style.right = '';
+    bg.style.width = document.getElementById('btn-monthly').offsetWidth + 'px';
+    document.getElementById('btn-monthly').classList.add('active');
+    document.getElementById('btn-yearly').classList.remove('active');
+  } else {
+    document.getElementById('btn-yearly').classList.add('active');
+    document.getElementById('btn-monthly').classList.remove('active');
+    bg.style.left = (document.getElementById('btn-monthly').offsetWidth + 4) + 'px';
+    bg.style.width = document.getElementById('btn-yearly').offsetWidth + 'px';
+  }
+
+  const nums = prices[mode];
+  ['price1','price2','price3'].forEach((id,i) => {
+    const el = document.getElementById(id);
+    const from = parseInt(el.textContent.replace(/,/g,''));
+    const to = nums[i];
+    let start = null;
+    function anim(ts) {
+      if (!start) start = ts;
+      const t = Math.min((ts-start)/400, 1);
+      const ease = 1 - Math.pow(1-t, 3);
+      const val = Math.round(from + (to - from)*ease);
+      el.textContent = val >= 1000 ? val.toLocaleString() : val;
+      if (t < 1) requestAnimationFrame(anim);
+    }
+    requestAnimationFrame(anim);
+  });
+}
+
+// Init toggle position
+window.addEventListener('load', () => {
+  const bg = document.getElementById('toggle-bg');
+  const btnM = document.getElementById('btn-monthly');
+  if (bg && btnM) { bg.style.left = '4px'; bg.style.width = btnM.offsetWidth + 'px'; }
+});
+
+</script>
+</body>
+</html>
